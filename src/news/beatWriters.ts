@@ -408,7 +408,7 @@ export const BEAT_WRITERS: (NewsSource & { verifiedFrom: string })[] = [
     "kind": "x",
     "category": "CLE",
     "role": "Beat writer, Akron Beacon Journal",
-    "verifiedFrom": "32beatwriters.com directory (live page, (c) 2026, no per-entry date)"
+    "verifiedFrom": "Bluesky profile bio, checked 2026-11-17"
   },
   {
     "id": "beat:pit:nick-farabaugh",
@@ -540,7 +540,7 @@ export const BEAT_WRITERS: (NewsSource & { verifiedFrom: string })[] = [
     "kind": "x",
     "category": "WAS",
     "role": "Beat writer, Last Man Standig (Substack)",
-    "verifiedFrom": "32beatwriters.com directory (live page, (c) 2026, no per-entry date)"
+    "verifiedFrom": "Bluesky profile bio, checked 2026-11-17"
   },
   {
     "id": "beat:chi:zack-pearson",
@@ -649,8 +649,8 @@ export const BEAT_WRITERS: (NewsSource & { verifiedFrom: string })[] = [
     "url": "https://x.com/alexinsdorf99",
     "kind": "x",
     "category": "LAC",
-    "role": "Beat writer, Bolt Beat",
-    "verifiedFrom": "32beatwriters.com directory (live page, (c) 2026, no per-entry date)"
+    "role": "Beat writer, Bolt Breakdowns / Bolt Beat",
+    "verifiedFrom": "Bluesky profile bio, checked 2026-11-17"
   },
   {
     "id": "beat:ten:easton-freeze",
@@ -701,11 +701,11 @@ export const BEAT_WRITERS: (NewsSource & { verifiedFrom: string })[] = [
     "name": "Colton Pouncy",
     "tier": "beat",
     "trust": "review",
-    "url": "https://apps.rotowire.com/football/rumors.php?team=DET",
+    "url": "https://bsky.app/profile/coltonpouncy.bsky.social",
     "kind": "web",
     "category": "DET",
-    "role": "Beat writer, The Athletic · unverified",
-    "verifiedFrom": "RotoWire team news credits (undated; may be 2025-26)"
+    "role": "Beat writer, The Athletic",
+    "verifiedFrom": "Bluesky profile bio, checked 2026-11-17"
   },
   {
     "id": "beat:det:dave-birkett",
@@ -723,11 +723,11 @@ export const BEAT_WRITERS: (NewsSource & { verifiedFrom: string })[] = [
     "name": "Matt Schneidman",
     "tier": "beat",
     "trust": "review",
-    "url": "https://apps.rotowire.com/football/rumors.php?team=GB",
+    "url": "https://bsky.app/profile/mattschneidman.bsky.social",
     "kind": "web",
     "category": "GB",
-    "role": "Beat writer, The Athletic · unverified",
-    "verifiedFrom": "RotoWire team news credits (undated; may be 2025-26)"
+    "role": "Beat writer, The Athletic",
+    "verifiedFrom": "Bluesky profile bio, checked 2026-11-17"
   },
   {
     "id": "beat:tb:rick-stroud",
@@ -789,11 +789,11 @@ export const BEAT_WRITERS: (NewsSource & { verifiedFrom: string })[] = [
     "name": "Luke Johnson",
     "tier": "beat",
     "trust": "review",
-    "url": "https://apps.rotowire.com/football/rumors.php?team=NO",
+    "url": "https://bsky.app/profile/bylukejohnson.bsky.social",
     "kind": "web",
     "category": "NO",
-    "role": "Beat writer, The Times-Picayune · unverified",
-    "verifiedFrom": "RotoWire team news credits (undated; may be 2025-26)"
+    "role": "Beat writer, The Times-Picayune",
+    "verifiedFrom": "Bluesky profile bio, checked 2026-11-17"
   },
   {
     "id": "beat:nyg:dan-duggan",
@@ -811,11 +811,11 @@ export const BEAT_WRITERS: (NewsSource & { verifiedFrom: string })[] = [
     "name": "Kevin Fishbain",
     "tier": "beat",
     "trust": "review",
-    "url": "https://apps.rotowire.com/football/rumors.php?team=CHI",
+    "url": "https://bsky.app/profile/kfishbain.bsky.social",
     "kind": "web",
     "category": "CHI",
-    "role": "Beat writer, The Athletic · unverified",
-    "verifiedFrom": "RotoWire team news credits (undated; may be 2025-26)"
+    "role": "Beat writer, The Athletic",
+    "verifiedFrom": "Bluesky profile bio, checked 2026-11-17"
   },
   {
     "id": "beat:sea:michael-shawn-dugar",
@@ -1047,5 +1047,38 @@ export const BEAT_WRITERS: (NewsSource & { verifiedFrom: string })[] = [
     "category": "national",
     "role": "NFL insider, NFL reporter (outlet not printed)",
     "verifiedFrom": "Cited as league-wide insider across 2025-26 RotoWire team news"
+  },
+  {
+    "id": "beat:buf:joe-buscaglia",
+    "name": "Joe Buscaglia",
+    "tier": "beat",
+    "trust": "review",
+    "url": "https://bsky.app/profile/joebuscaglia.bsky.social",
+    "kind": "web",
+    "category": "BUF",
+    "role": "Beat writer, The Athletic",
+    "verifiedFrom": "Bluesky profile bio, checked 2026-11-17"
+  },
+  {
+    "id": "beat:ne:chad-graff",
+    "name": "Chad Graff",
+    "tier": "beat",
+    "trust": "review",
+    "url": "https://bsky.app/profile/chadgraff.bsky.social",
+    "kind": "web",
+    "category": "NE",
+    "role": "Beat writer, The Athletic",
+    "verifiedFrom": "Bluesky profile bio, checked 2026-11-17"
+  },
+  {
+    "id": "beat:was:tashan-reed",
+    "name": "Tashan Reed",
+    "tier": "beat",
+    "trust": "review",
+    "url": "https://bsky.app/profile/tashanreed.bsky.social",
+    "kind": "web",
+    "category": "WAS",
+    "role": "Beat writer, The Washington Post",
+    "verifiedFrom": "Bluesky profile bio, checked 2026-11-17"
   }
 ];
