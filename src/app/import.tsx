@@ -5,9 +5,9 @@ import { Pressable, View } from 'react-native';
 import { Button, c, Card, H1, H2, Input, Screen, T } from '../components/ui';
 import { CURRENT_SEASON } from '../demo/league';
 import { pickLabel } from '../engine';
-import { SLEEPER_DEMO_LEAGUE_ID, SLEEPER_DEMO_PLAYER_DB, sleeperDemoFetch } from '../import/fixtures/sleeperDemo';
+import { SLEEPER_DEMO_PLAYER_DB, SLEEPER_DEMO_USERNAME, sleeperDemoFetch } from '../import/fixtures/sleeperDemo';
 import { claimTeam, migrationMessage, migrationProgress, startMigration } from '../import/migrate';
-import { importSleeperLeague } from '../import/sleeper';
+import { findSleeperLeagues, importSleeperLeague, type SleeperLeagueSummary } from '../import/sleeper';
 import { importFromText } from '../import/text';
 import type { ImportedLeague } from '../import/types';
 import { settingsForFormat } from '../engine';
@@ -17,8 +17,8 @@ import { type } from '../theme/type';
 type Source = 'sleeper' | 'paste' | 'espn' | 'yahoo' | 'mfl' | 'fleaflicker';
 
 const SOURCES: { key: Source; label: string; how: string; ready: boolean }[] = [
-  { key: 'sleeper', label: 'Sleeper', how: 'Paste your league link. Everything comes over, including past seasons.', ready: true },
-  { key: 'paste', label: 'Anywhere else (paste rosters)', how: 'Copy rosters from any site or spreadsheet. We match every name.', ready: true },
+  { key: 'sleeper', label: 'Sleeper', how: 'Type your Sleeper username and pick the league.', ready: true },
+  { key: 'paste', label: 'Anywhere else', how: 'Paste rosters from any site or spreadsheet. We match every name.', ready: true },
   { key: 'espn', label: 'ESPN', how: 'Sign in to ESPN once so we can read your private league.', ready: false },
   { key: 'yahoo', label: 'Yahoo', how: 'Approve Coil in Yahoo and pick your league.', ready: false },
   { key: 'mfl', label: 'MyFantasyLeague', how: 'Paste your league link. Contracts and salaries included.', ready: false },
@@ -50,19 +50,32 @@ export default function Import() {
   const last = useApp((s) => s.lastImport);
   const toast = useApp((s) => s.showToast);
   const [source, setSource] = useState<Source | null>(null);
-  const [link, setLink] = useState(`https://sleeper.com/leagues/${SLEEPER_DEMO_LEAGUE_ID}`);
+  const [username, setUsername] = useState(SLEEPER_DEMO_USERNAME);
+  const [found, setFound] = useState<{ displayName: string; leagues: SleeperLeagueSummary[] } | null>(null);
   const [text, setText] = useState(SAMPLE);
   const [result, setResult] = useState<{ league: ImportedLeague; review: { teamName: string; raw: string; suggestion?: string }[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [migration, setMigration] = useState(last?.migration ?? null);
 
-  const runSleeper = async () => {
+  const lookup = async () => {
     setBusy(true);
     setError(null);
     try {
-      // The preview can't reach Sleeper, so it reads a sample league in Sleeper's exact format.
-      const league = await importSleeperLeague(link, { fetch: sleeperDemoFetch, playerDb: SLEEPER_DEMO_PLAYER_DB });
+      // The preview can't reach Sleeper, so it answers with sample data in Sleeper's exact format.
+      setFound(await findSleeperLeagues(username, CURRENT_SEASON, { fetch: sleeperDemoFetch }));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runSleeper = async (leagueId: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const league = await importSleeperLeague(leagueId, { fetch: sleeperDemoFetch, playerDb: SLEEPER_DEMO_PLAYER_DB });
       setResult({ league, review: [] });
     } catch (e) {
       setError((e as Error).message);
@@ -205,10 +218,8 @@ export default function Import() {
       <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
         <T muted style={type.smallStrong}>‹ Home</T>
       </Pressable>
-      <H1 kicker="About a minute">Bring your league over</H1>
-      <T muted style={{ marginBottom: 12 }}>
-        Rosters, future and traded picks, keepers, taxi, IR, FAAB and past champions. You import once; everyone else just taps a link.
-      </T>
+      <H1>Bring your league over</H1>
+      <T muted style={{ marginBottom: 12 }}>You keep everything. Your league just taps a link.</T>
       {SOURCES.map((s) => (
         <Card key={s.key} highlight={source === s.key} onPress={() => (s.ready ? setSource(s.key) : toast(`${s.label} import is next on the list. Paste rosters works today.`))}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -218,11 +229,26 @@ export default function Import() {
           <T muted style={{ marginTop: 2 }}>{s.how}</T>
           {source === 'sleeper' && s.key === 'sleeper' ? (
             <View style={{ marginTop: 12 }}>
-              <Input value={link} onChangeText={setLink} autoCapitalize="none" placeholder="sleeper.com/leagues/…" />
+              <Input value={username} onChangeText={(v) => { setUsername(v); setFound(null); }} autoCapitalize="none" autoCorrect={false} placeholder="Sleeper username" onSubmitEditing={lookup} />
               {error ? <T style={{ color: c.danger, marginTop: 6 }}>{error}</T> : null}
               <View style={{ height: 8 }} />
-              <Button label={busy ? 'Reading your league…' : 'Import from Sleeper'} disabled={busy} onPress={runSleeper} />
-              <T muted style={[type.micro, { marginTop: 6 }]}>Preview uses a sample league.</T>
+              {!found ? <Button label={busy ? 'Looking you up…' : 'Find my leagues'} disabled={busy || !username.trim()} onPress={lookup} /> : null}
+              {found ? (
+                <>
+                  <T muted style={[type.small, { marginBottom: 6 }]}>{found.displayName}'s leagues. Tap one to bring it over.</T>
+                  {found.leagues.map((lg) => (
+                    <Pressable key={lg.leagueId} disabled={busy} onPress={() => runSleeper(lg.leagueId)} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: c.border, marginBottom: 6, backgroundColor: c.surfaceAlt }}>
+                      <View style={{ flex: 1 }}>
+                        <T style={type.bodyStrong}>{lg.name}</T>
+                        <T muted style={type.small}>{lg.format} · {lg.teams} teams · {lg.season}</T>
+                      </View>
+                      <T style={{ color: c.accent }}>{busy ? '…' : 'Import ›'}</T>
+                    </Pressable>
+                  ))}
+                  {!found.leagues.length ? <T muted>No leagues found for this season.</T> : null}
+                </>
+              ) : null}
+              <T muted style={[type.micro, { marginTop: 6 }]}>Preview uses sample data. Only "Group Chat Dynasty" imports.</T>
             </View>
           ) : null}
           {source === 'paste' && s.key === 'paste' ? (

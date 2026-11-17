@@ -57,6 +57,14 @@ export const SLEEPER_DEMO_PLAYER_DB: Record<string, unknown> = {
 };
 
 export const SLEEPER_DEMO_LEAGUE_ID = LEAGUE_ID;
+export const SLEEPER_DEMO_USERNAME = 'rattleandroll';
+
+// User lookup and league list, in Sleeper's response shape.
+SLEEPER_DEMO_RESPONSES[`/user/${SLEEPER_DEMO_USERNAME}`] = { user_id: 'u_demo_1', username: SLEEPER_DEMO_USERNAME, display_name: 'RattleAndRoll', avatar: null };
+SLEEPER_DEMO_RESPONSES['/user/u_demo_1/leagues/nfl/2026'] = [
+  { league_id: LEAGUE_ID, name: 'Group Chat Dynasty', season: '2026', total_rosters: 4, settings: { type: 2 }, avatar: null },
+  { league_id: '999000111222', name: 'Work League (redraft)', season: '2026', total_rosters: 12, settings: { type: 0 }, avatar: null },
+];
 
 /** A fetch that answers from the fixture, so imports work offline. */
 export const sleeperDemoFetch = async (url: string) => {

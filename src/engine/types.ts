@@ -44,12 +44,16 @@ export type StatKey =
   | 'pass2pt'
   | 'pass1stDown'
   | 'sacked'
+  | 'sackedYds'
+  | 'pass40'
+  | 'passIntTd'
   // rushing
   | 'rushYds'
   | 'rushTd'
   | 'rushAtt'
   | 'rush2pt'
   | 'rush1stDown'
+  | 'rush40'
   // receiving
   | 'rec'
   | 'recYds'
@@ -57,6 +61,7 @@ export type StatKey =
   | 'recTgt'
   | 'rec2pt'
   | 'rec1stDown'
+  | 'rec40'
   // misc offense
   | 'fumLost'
   | 'fum'
@@ -64,7 +69,12 @@ export type StatKey =
   | 'prTd'
   | 'krYds'
   | 'prYds'
+  | 'fumRecTd'
+  | 'ownFumRec'
   // kicking
+  | 'fgMade'
+  | 'fgYds'
+  | 'fgYdsOver30'
   | 'fgMiss'
   | 'xpMade'
   | 'xpMiss'
@@ -78,16 +88,41 @@ export type StatKey =
   | 'stTd'
   | 'pointsAllowed'
   | 'yardsAllowed'
+  | 'defIntYds'
+  | 'defFumRetYds'
+  | 'defBlkKickYds'
+  | 'def2ptRet'
+  | 'defTkl'
+  | 'defTfl'
+  | 'defSackYds'
+  | 'defQbHit'
+  | 'defPassDef'
+  | 'defFf'
+  | 'def3AndOut'
+  | 'def4thStop'
+  | 'defForcedPunt'
+  | 'defMissedFgRetYds'
+  | 'defKrYds'
+  | 'defPrYds'
+  | 'stFf'
+  | 'stFumRec'
+  | 'stSoloTkl'
+  | 'stTkl'
   // individual defensive players
   | 'idpSoloTkl'
   | 'idpAstTkl'
+  | 'idpTkl'
   | 'idpSack'
+  | 'idpSackYds'
   | 'idpTfl'
   | 'idpQbHit'
   | 'idpInt'
+  | 'idpIntYds'
   | 'idpPassDef'
   | 'idpFf'
   | 'idpFumRec'
+  | 'idpFumRetYds'
+  | 'idpBlkKick'
   | 'idpTd'
   | 'idpSafety';
 
@@ -98,8 +133,16 @@ export type StatLine = Partial<Record<StatKey, number>> & {
   passTdYards?: number[];
   rushTdYards?: number[];
   recTdYards?: number[];
-  /** Yards on each catch, for tiered PPR. */
+  /** Yards on each catch, for tiered PPR and catch-length bonuses. */
   recYardsEach?: number[];
+  /** Yards on each carry and each completion, for big-play bonuses on any play. */
+  rushYardsEach?: number[];
+  passCmpYardsEach?: number[];
+  /** Distance of each missed field goal. */
+  fgMissYards?: number[];
+  /** Length of each interception / fumble return TD (defense or IDP). */
+  intRetTdYards?: number[];
+  fumRetTdYards?: number[];
 };
 
 export type Player = {

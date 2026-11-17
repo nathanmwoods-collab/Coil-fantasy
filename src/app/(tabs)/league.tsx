@@ -1,110 +1,55 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 
-import { Button, Card, H1, H2, Screen, Segmented, T } from '../../components/ui';
-import { CURRENT_WEEK, ME } from '../../demo/league';
-import { pickLabel, playoffEndWeek, winPct } from '../../engine';
-import { useApp } from '../../store/useApp';
+import { LeagueHeader, TeamAvatar } from '../../components/league';
+import { draftSummary, irSummary, playoffSummary, rosterSummary, scoringSummary, tradeSummary, waiverSummary } from '../../components/summaries';
+import { Button, c, Card, H2, Screen, Segmented, T } from '../../components/ui';
+import { CURRENT_WEEK, ME, teamWeek, type TeamWeek } from '../../demo/league';
+import { winProbability } from '../../demo/games';
+import { pickLabel } from '../../engine';
+import { isCommish, useApp } from '../../store/useApp';
 import { type } from '../../theme/type';
+
+type Tab = 'standings' | 'matchups' | 'picks' | 'rules';
 
 export default function League() {
   const L = useApp((s) => s.league);
-  const [tab, setTab] = useState<'standings' | 'matchups' | 'picks' | 'rules'>('standings');
-  const name = (id: string) => L.teams.find((t) => t.id === id)!;
+  const [tab, setTab] = useState<Tab>('standings');
+  const dynasty = L.settings.format === 'dynasty';
+  const commish = isCommish(L);
+  const team = (id: string) => L.teams.find((t) => t.id === id)!;
   const playoffTeams = L.settings.playoffs.teams;
 
-  const thisWeek = L.schedule.filter((m) => m.week === CURRENT_WEEK);
+  const thisWeek = useMemo(() => L.schedule.filter((m) => m.week === CURRENT_WEEK), [L]);
+  const weekly = useMemo(() => Object.fromEntries(L.teams.map((t) => [t.id, teamWeek(L, t.id, CURRENT_WEEK)])) as Record<string, TeamWeek>, [L]);
   const mine = thisWeek.find((m) => m.home === ME || m.away === ME);
-  const proj = (teamId: string) =>
-    Math.round(
-      name(teamId)
-        .players.filter((p) => !name(teamId).ir.includes(p) && !name(teamId).taxi.includes(p))
-        .map((p) => L.players[p].proj / 17)
-        .sort((a, b) => b - a)
-        .slice(0, 10)
-        .reduce((s, x) => s + x, 0) * 10,
-    ) / 10;
+  const shownTab: Tab = tab === 'picks' && !dynasty ? 'standings' : tab;
+
+  const options: { key: Tab; label: string }[] = [
+    { key: 'standings', label: 'Standings' },
+    { key: 'matchups', label: 'Matchups' },
+    ...(dynasty ? [{ key: 'picks' as Tab, label: 'Picks' }] : []),
+    { key: 'rules', label: 'Rules' },
+  ];
 
   return (
     <Screen>
-      <H1 kicker={`Week ${CURRENT_WEEK} · Dynasty`}>{L.name}</H1>
+      <LeagueHeader sub={`Week ${CURRENT_WEEK}`} />
 
-      {mine ? (
-        <Card highlight>
-          <T style={[type.label, { color: '#2EE6C5', textTransform: 'uppercase', letterSpacing: 1 }]}>This week</T>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
-            {[mine.home, mine.away].map((id, i) => (
-              <View key={id} style={{ alignItems: i ? 'flex-end' : 'flex-start', flex: 1 }}>
-                <T style={{ fontSize: 26 }}>{name(id).emoji}</T>
-                <T style={type.bodyStrong} numberOfLines={1}>{name(id).name}</T>
-                <T style={[type.display32, { color: id === ME ? '#7C5CFF' : '#F4F3FF' }]}>{proj(id).toFixed(1)}</T>
-                <T muted style={type.micro}>projected</T>
-              </View>
-            ))}
-          </View>
-        </Card>
-      ) : null}
+      {mine ? <MatchupCard L={L} home={mine.home === ME ? mine.home : mine.away} away={mine.home === ME ? mine.away : mine.home} weekly={weekly} big /> : null}
 
       <View style={{ marginTop: 10 }}>
-        <Segmented
-          value={tab}
-          onChange={setTab}
-          options={[
-            { key: 'standings', label: 'Standings' },
-            { key: 'matchups', label: 'Matchups' },
-            { key: 'picks', label: 'Picks' },
-            { key: 'rules', label: 'Rules' },
-          ]}
-        />
+        <Segmented value={shownTab} onChange={setTab} options={options} />
       </View>
 
-      {tab === 'standings' && (
-        <Card style={{ padding: 0 }}>
-          {L.standings.map((r, i) => {
-            const t = name(r.teamId);
-            return (
-              <View key={r.teamId}>
-                {i === playoffTeams ? <View style={{ height: 2, backgroundColor: '#2EE6C5', opacity: 0.5 }} /> : null}
-                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: r.teamId === ME ? '#7C5CFF22' : undefined }}>
-                  <T style={[type.num, { width: 22, color: '#9A98B8' }]}>{i + 1}</T>
-                  <T style={{ fontSize: 18, width: 28 }}>{t.emoji}</T>
-                  <View style={{ flex: 1 }}>
-                    <T style={type.bodyStrong} numberOfLines={1}>{t.name}</T>
-                    <T muted style={type.micro}>{t.manager} · all-play {(winPct({ wins: r.allPlayWins, losses: r.allPlayLosses, ties: r.allPlayTies }) * 100).toFixed(0)}%</T>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <T style={type.num}>{r.wins}-{r.losses}{r.ties ? `-${r.ties}` : ''}</T>
-                    <T muted style={[type.num, { fontSize: 11 }]}>{r.pointsFor.toFixed(1)} PF</T>
-                  </View>
-                </View>
-              </View>
-            );
-          })}
-          <T muted style={[type.micro, { padding: 12 }]}>Top {playoffTeams} make the playoffs. Records include the weekly median game.</T>
-        </Card>
-      )}
+      {shownTab === 'standings' && <Standings />}
 
-      {tab === 'matchups' && (
-        <>
-          {thisWeek.map((m) => (
-            <Card key={m.home}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <T style={type.bodyStrong}>{name(m.home).emoji} {name(m.home).name}</T>
-                <T style={type.num}>{proj(m.home).toFixed(1)}</T>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                <T style={type.bodyStrong}>{name(m.away).emoji} {name(m.away).name}</T>
-                <T style={type.num}>{proj(m.away).toFixed(1)}</T>
-              </View>
-            </Card>
-          ))}
-        </>
-      )}
+      {shownTab === 'matchups' && thisWeek.map((m) => <MatchupCard key={m.home} L={L} home={m.home} away={m.away} weekly={weekly} />)}
 
-      {tab === 'picks' && (
+      {shownTab === 'picks' && (
         <>
-          <Button label="Trade draft picks" onPress={() => router.push('/trade')} />
+          <Button label="Build a trade" onPress={() => router.push('/trade')} />
           {[...new Set(L.picks.map((p) => p.season))].map((season) => (
             <View key={season}>
               <H2>{season} rookie draft</H2>
@@ -112,10 +57,11 @@ export default function League() {
                 {L.teams.map((t) => {
                   const owned = L.picks.filter((p) => p.season === season && p.ownerTeamId === t.id).sort((a, b) => a.round - b.round);
                   return (
-                    <View key={t.id} style={{ flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderBottomColor: '#2C2C4A', backgroundColor: t.id === ME ? '#7C5CFF22' : undefined }}>
-                      <T style={[type.smallStrong, { width: 140 }]} numberOfLines={1}>{t.emoji} {t.name}</T>
+                    <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: t.id === ME ? '#7C5CFF22' : undefined }}>
+                      <TeamAvatar team={t} size={24} />
+                      <T style={[type.smallStrong, { width: 120 }]} numberOfLines={1}>{t.name}</T>
                       <T muted style={[type.small, { flex: 1 }]}>
-                        {owned.length ? owned.map((p) => pickLabel(p, (id) => name(id).name).replace(`${season} `, '')).join(', ') : 'No picks'}
+                        {owned.length ? owned.map((p) => pickLabel(p, (id) => team(id).name).replace(`${season} `, '')).join(', ') : 'No picks'}
                       </T>
                     </View>
                   );
@@ -126,25 +72,145 @@ export default function League() {
         </>
       )}
 
-      {tab === 'rules' && (
-        <Card>
-          {[
-            ['Scoring', 'Superflex PPR, 4-pt passing TDs'],
-            ['Roster', 'QB, 2 RB, 3 WR, TE, FLEX, SUPERFLEX, 8 bench, 2 IR, 3 taxi'],
-            ['IR allows', L.settings.irEligible.map((s) => s.toUpperCase()).join(', ')],
-            ['Taxi squad', `Rookies and second-year players`],
-            ['Waivers', `FAAB, $${L.settings.waivers.faabBudget} budget, runs Wednesday`],
-            ['Trades', `No review, deadline week ${L.settings.trades.deadlineWeek}, picks ${L.settings.trades.futurePickSeasons} seasons out`],
-            ['Playoffs', `${playoffTeams} teams, weeks ${L.settings.playoffs.startWeek}–${playoffEndWeek(L.settings)}`],
-            ['Rookie draft', `${L.settings.dynasty.rookieDraftRounds} rounds, linear, by max points`],
-          ].map(([k, v]) => (
-            <View key={k} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#2C2C4A' }}>
-              <T muted style={type.small}>{k}</T>
-              <T>{v}</T>
-            </View>
-          ))}
-        </Card>
+      {shownTab === 'rules' && (
+        <>
+          <Card style={{ paddingVertical: 4 }}>
+            {(
+              [
+                ['Scoring', scoringSummary(L.settings.scoring), '/settings/scoring'],
+                ['Roster', rosterSummary(L.settings), '/settings/roster'],
+                ['Injured reserve', irSummary(L.settings), '/settings/roster'],
+                ...(dynasty ? [['Taxi squad', `${L.settings.dynasty.taxiSlots} spots, players in their first ${L.settings.dynasty.taxiMaxYearsPro + 1} seasons`, '/settings/roster']] : []),
+                ['Waivers', waiverSummary(L.settings), '/settings/moves'],
+                ['Trades', tradeSummary(L.settings), '/settings/moves'],
+                ['Playoffs', playoffSummary(L.settings), '/settings/playoffs'],
+                ['Draft', draftSummary(L.settings), '/settings/draft'],
+              ] as [string, string, string][]
+            ).map(([k, v, href]) => (
+              <Pressable key={k} onPress={() => router.push(href as never)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border }}>
+                <View style={{ flex: 1 }}>
+                  <T muted style={type.small}>{k}</T>
+                  <T>{v}</T>
+                </View>
+                <T muted style={type.smallStrong}>{commish ? 'Edit ›' : '›'}</T>
+              </Pressable>
+            ))}
+          </Card>
+          <T muted style={[type.micro, { textAlign: 'center' }]}>
+            {commish ? "You're a commissioner. Any change you save is posted in league chat so nobody is surprised." : 'Only commissioners can change rules. Every change shows up in league chat.'}
+          </T>
+        </>
       )}
     </Screen>
+  );
+}
+
+function MatchupCard({ L, home, away, weekly, big }: { L: ReturnType<typeof useApp.getState>['league']; home: string; away: string; weekly: Record<string, TeamWeek>; big?: boolean }) {
+  const a = weekly[home];
+  const b = weekly[away];
+  const ta = L.teams.find((t) => t.id === home)!;
+  const tb = L.teams.find((t) => t.id === away)!;
+  const p = winProbability(a.liveProjected, b.liveProjected, (a.remaining + b.remaining) / 2);
+  const side = (t: typeof ta, w: TeamWeek, right: boolean, leading: boolean) => (
+    <View style={{ flex: 1, alignItems: right ? 'flex-end' : 'flex-start' }}>
+      <View style={{ flexDirection: right ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+        <TeamAvatar team={t} size={big ? 36 : 28} />
+        <View style={{ alignItems: right ? 'flex-end' : 'flex-start', flexShrink: 1 }}>
+          <T style={type.bodyStrong} numberOfLines={1}>{t.name}</T>
+          <T muted style={type.micro}>{t.manager}</T>
+        </View>
+      </View>
+      <T style={[big ? type.display32 : [type.num, { fontSize: 20 }], { color: leading ? (t.id === ME ? c.primary : c.text) : c.textMuted, marginTop: 6 }]}>{w.points.toFixed(2)}</T>
+      <T muted style={type.micro}>proj {w.liveProjected.toFixed(2)}</T>
+    </View>
+  );
+  return (
+    <Card highlight={big} onPress={() => router.push({ pathname: '/matchup', params: { a: home, b: away } })}>
+      {big ? <T style={[type.label, { color: c.accent, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }]}>Your matchup · live</T> : null}
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {side(ta, a, false, a.points >= b.points)}
+        {side(tb, b, true, b.points > a.points)}
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
+        <T style={[type.num, { fontSize: 11, color: c.textMuted, width: 34 }]}>{Math.round(p * 100)}%</T>
+        <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: c.surfaceAlt, overflow: 'hidden', flexDirection: 'row' }}>
+          <View style={{ width: `${p * 100}%`, backgroundColor: c.accent }} />
+        </View>
+        <T style={[type.num, { fontSize: 11, color: c.textMuted, width: 34, textAlign: 'right' }]}>{Math.round((1 - p) * 100)}%</T>
+      </View>
+      <T muted style={[type.micro, { textAlign: 'center', marginTop: 6 }]}>Tap for every player, live</T>
+    </Card>
+  );
+}
+
+const COLS: { key: string; label: string; w: number }[] = [
+  { key: 'rec', label: 'W-L', w: 56 },
+  { key: 'pf', label: 'PF', w: 70 },
+  { key: 'pa', label: 'PA', w: 70 },
+  { key: 'max', label: 'MAX PF', w: 74 },
+  { key: 'faab', label: 'FAAB', w: 54 },
+  { key: 'claims', label: 'CLAIMS', w: 60 },
+  { key: 'wp', label: 'WAIVER', w: 60 },
+];
+
+function Standings() {
+  const L = useApp((s) => s.league);
+  const playoffTeams = L.settings.playoffs.teams;
+  const rows = L.standings.map((r, i) => ({ r, i, t: L.teams.find((t) => t.id === r.teamId)! }));
+  const cell = (key: string, r: (typeof rows)[number]) => {
+    switch (key) {
+      case 'rec':
+        return `${r.r.wins}-${r.r.losses}${r.r.ties ? `-${r.r.ties}` : ''}`;
+      case 'pf':
+        return r.r.pointsFor.toFixed(1);
+      case 'pa':
+        return r.r.pointsAgainst.toFixed(1);
+      case 'max':
+        return r.r.maxPointsFor.toFixed(1);
+      case 'faab':
+        return L.settings.waivers.type === 'faab' ? `$${r.t.faab}` : '–';
+      case 'claims':
+        return String(r.t.claims);
+      case 'wp':
+        return `#${r.t.waiverPriority}`;
+    }
+    return '';
+  };
+  const ROW_H = 52;
+  const line = (i: number) => (i === playoffTeams - 1 ? { borderBottomWidth: 2, borderBottomColor: c.accent } : { borderBottomWidth: 1, borderBottomColor: c.border });
+  return (
+    <Card style={{ padding: 0, flexDirection: 'row', overflow: 'hidden' }}>
+      <View style={{ width: 168 }}>
+        <View style={{ height: 30, justifyContent: 'center', paddingLeft: 12, borderBottomWidth: 1, borderBottomColor: c.border }}>
+          <T muted style={type.label}>TEAM</T>
+        </View>
+        {rows.map((row) => (
+          <Pressable key={row.t.id} onPress={() => router.push(`/team/${row.t.id}`)} style={[{ height: ROW_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 10, gap: 8, backgroundColor: row.t.id === ME ? '#7C5CFF22' : undefined }, line(row.i)]}>
+            <T style={[type.num, { width: 18, color: c.textMuted, fontSize: 12 }]}>{row.i + 1}</T>
+            <TeamAvatar team={row.t} size={26} />
+            <View style={{ flex: 1 }}>
+              <T style={type.smallStrong} numberOfLines={1}>{row.t.name}</T>
+              <T muted style={type.micro} numberOfLines={1}>{row.t.manager}</T>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View>
+          <View style={{ height: 30, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: c.border }}>
+            {COLS.map((col) => (
+              <T key={col.key} muted style={[type.label, { width: col.w, textAlign: 'right', paddingRight: 10 }]}>{col.label}</T>
+            ))}
+          </View>
+          {rows.map((row) => (
+            <View key={row.t.id} style={[{ height: ROW_H, flexDirection: 'row', alignItems: 'center', backgroundColor: row.t.id === ME ? '#7C5CFF22' : undefined }, line(row.i)]}>
+              {COLS.map((col) => (
+                <T key={col.key} style={[type.num, { width: col.w, textAlign: 'right', paddingRight: 10, fontSize: 13, color: col.key === 'rec' ? c.text : c.textMuted }]}>{cell(col.key, row)}</T>
+              ))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </Card>
   );
 }

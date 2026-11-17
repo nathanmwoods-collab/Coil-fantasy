@@ -7,7 +7,7 @@
 // rarely used settings should be re-checked against live leagues before launch.
 
 import { createFuturePicks, pickId, type DraftPick } from '../engine/picks';
-import { scoringFromPreset, type ScoringRules } from '../engine/scoring';
+import { scoringFromPreset, type BigPlayBonus, type MilestoneStat, type ScoringRules } from '../engine/scoring';
 import { defaultSettings, type LeagueFormat, type LeagueSettings } from '../engine/settings';
 import type { InjuryStatus, Position, SlotType, StatKey } from '../engine/types';
 import type { ImportedLeague, ImportedPlayer, ImportedSeason, ImportedTeam } from './types';
@@ -51,6 +51,43 @@ const SCORING_MAP: Record<string, StatKey> = {
   pass_2pt: 'pass2pt',
   pass_fd: 'pass1stDown',
   pass_sack: 'sacked',
+  pass_int_td: 'passIntTd',
+  pass_cmp_40p: 'pass40',
+  rush_40p: 'rush40',
+  rec_40p: 'rec40',
+  fum_rec_td: 'fumRecTd',
+  fgm: 'fgMade',
+  fgm_yds: 'fgYds',
+  fgm_yds_over_30: 'fgYdsOver30',
+  pts_allow: 'pointsAllowed',
+  yds_allow: 'yardsAllowed',
+  int_ret_yd: 'defIntYds',
+  fum_ret_yd: 'defFumRetYds',
+  blk_kick_ret_yd: 'defBlkKickYds',
+  def_2pt: 'def2ptRet',
+  tkl: 'defTkl',
+  tkl_loss: 'defTfl',
+  sack_yd: 'defSackYds',
+  qb_hit: 'defQbHit',
+  def_pass_def: 'defPassDef',
+  ff: 'defFf',
+  def_3_and_out: 'def3AndOut',
+  def_4_and_stop: 'def4thStop',
+  def_forced_punts: 'defForcedPunt',
+  fg_ret_yd: 'defMissedFgRetYds',
+  def_kr_yd: 'defKrYds',
+  def_pr_yd: 'defPrYds',
+  st_ff: 'stFf',
+  def_st_ff: 'stFf',
+  st_fum_rec: 'stFumRec',
+  def_st_fum_rec: 'stFumRec',
+  st_tkl_solo: 'stSoloTkl',
+  def_st_tkl_solo: 'stSoloTkl',
+  idp_tkl: 'idpTkl',
+  idp_sack_yd: 'idpSackYds',
+  idp_int_ret_yd: 'idpIntYds',
+  idp_fum_ret_yd: 'idpFumRetYds',
+  idp_blk_kick: 'idpBlkKick',
   rush_yd: 'rushYds',
   rush_td: 'rushTd',
   rush_att: 'rushAtt',
@@ -92,6 +129,8 @@ const SCORING_MAP: Record<string, StatKey> = {
   idp_safe: 'idpSafety',
 };
 
+const REVERSE = Object.fromEntries(Object.entries(SCORING_MAP).map(([k, v]) => [v, k])) as Record<StatKey, string>;
+
 export function mapSleeperScoring(raw: Record<string, number>, warnings: string[]): ScoringRules {
   const rules = scoringFromPreset('standard');
   rules.points = {};
@@ -108,13 +147,68 @@ export function mapSleeperScoring(raw: Record<string, number>, warnings: string[
   for (const [key, pos] of prem) {
     if (raw[key]) rules.positionOverrides[pos] = { ...rules.positionOverrides[pos], rec: (raw.rec ?? 0) + raw[key] };
   }
-  // Yardage bonuses like bonus_rush_yd_100, bonus_pass_yd_300
-  for (const [key, value] of Object.entries(raw)) {
-    const m = key.match(/^bonus_(pass|rush|rec)_yd_(\d+)$/);
-    if (m && value) {
-      const stat: StatKey = m[1] === 'pass' ? 'passYds' : m[1] === 'rush' ? 'rushYds' : 'recYds';
-      rules.bonuses.push({ stat, threshold: Number(m[2]), points: value });
+  // Big games: bonus_rush_yd_100 + bonus_rush_yd_200 become ranges (100–199, 200+).
+  const handled = new Set<string>();
+  const yardStat: Record<string, MilestoneStat> = { pass: 'passYds', rush: 'rushYds', rec: 'recYds', rush_rec: 'rushRecYds' };
+  for (const kind of Object.keys(yardStat)) {
+    const steps = Object.keys(raw)
+      .map((k) => k.match(new RegExp(`^bonus_${kind}_yd_(\\d+)$`)))
+      .filter((m): m is RegExpMatchArray => !!m)
+      .map((m) => ({ key: m[0], min: Number(m[1]) }))
+      .sort((a, b) => a.min - b.min);
+    steps.forEach((st, i) => {
+      handled.add(st.key);
+      if (raw[st.key]) rules.milestones.push({ stat: yardStat[kind], min: st.min, max: steps[i + 1] ? steps[i + 1].min - 1 : undefined, points: raw[st.key] });
+    });
+  }
+  // Volume and defensive bonuses.
+  const thresholds: [string, MilestoneStat, number][] = [
+    ['bonus_pass_cmp_25', 'passCmp', 25],
+    ['bonus_rush_att_20', 'rushAtt', 20],
+    ['bonus_tkl_10p', 'idpTkl', 10],
+    ['bonus_sack_2p', 'idpSack', 2],
+    ['bonus_def_pass_def_3p', 'idpPassDef', 3],
+  ];
+  for (const [key, stat, threshold] of thresholds) {
+    handled.add(key);
+    if (raw[key]) rules.bonuses.push({ stat, threshold, points: raw[key] });
+  }
+  // First downs by position.
+  for (const pos of ['QB', 'RB', 'WR', 'TE'] as Position[]) {
+    const key = `bonus_fd_${pos.toLowerCase()}`;
+    handled.add(key);
+    if (raw[key]) {
+      const o = { ...rules.positionOverrides[pos] };
+      for (const stat of ['pass1stDown', 'rush1stDown', 'rec1stDown'] as StatKey[]) o[stat] = (raw[REVERSE[stat]] ?? 0) + raw[key];
+      rules.positionOverrides[pos] = o;
     }
+  }
+  // Big-play TDs.
+  const big: [string, BigPlayBonus['kind'], number][] = [
+    ['pass_td_40p', 'pass', 40],
+    ['pass_td_50p', 'pass', 50],
+    ['rush_td_40p', 'rush', 40],
+    ['rush_td_50p', 'rush', 50],
+    ['rec_td_40p', 'rec', 40],
+    ['rec_td_50p', 'rec', 50],
+    ['bonus_def_int_td_50p', 'intRet', 50],
+    ['bonus_def_fum_td_50p', 'fumRet', 50],
+  ];
+  for (const [key, kind, minYards] of big) {
+    handled.add(key);
+    if (raw[key]) rules.bigPlays.push({ kind, minYards, points: raw[key], on: 'td' });
+  }
+  // Catch length.
+  const catchLen: [string, number][] = [
+    ['rec_0_4', 0],
+    ['rec_5_9', 5],
+    ['rec_10_19', 10],
+    ['rec_20_29', 20],
+    ['rec_30_39', 30],
+  ];
+  for (const [key, minYards] of catchLen) {
+    handled.add(key);
+    if (raw[key]) rules.catchLengthBonuses.push({ minYards, points: raw[key] });
   }
   // Field goals by distance
   const fg: [string, number][] = [
@@ -122,12 +216,24 @@ export function mapSleeperScoring(raw: Record<string, number>, warnings: string[
     ['fgm_20_29', 20],
     ['fgm_30_39', 30],
     ['fgm_40_49', 40],
+    ['fgm_50_59', 50],
     ['fgm_50p', 50],
+    ['fgm_60p', 60],
   ];
+  fg.forEach(([k]) => handled.add(k));
   if (fg.some(([k]) => raw[k] !== undefined)) {
     rules.fieldGoalTiers = fg.filter(([k]) => raw[k] !== undefined).map(([k, minYards]) => ({ minYards, points: raw[k] }));
   }
-  // Points allowed tiers
+  const miss: [string, number][] = [
+    ['fgmiss_0_19', 0],
+    ['fgmiss_20_29', 20],
+    ['fgmiss_30_39', 30],
+    ['fgmiss_40_49', 40],
+    ['fgmiss_50p', 50],
+  ];
+  miss.forEach(([k]) => handled.add(k));
+  rules.fieldGoalMissTiers = miss.filter(([k]) => raw[k]).map(([k, minYards]) => ({ minYards, points: raw[k] }));
+  // Points and yards allowed tiers
   const pa: [string, number][] = [
     ['pts_allow_0', 0],
     ['pts_allow_1_6', 6],
@@ -137,12 +243,26 @@ export function mapSleeperScoring(raw: Record<string, number>, warnings: string[
     ['pts_allow_28_34', 34],
     ['pts_allow_35p', Number.MAX_SAFE_INTEGER],
   ];
+  pa.forEach(([k]) => handled.add(k));
   if (pa.some(([k]) => raw[k] !== undefined)) {
     rules.pointsAllowedTiers = pa.filter(([k]) => raw[k] !== undefined).map(([k, max]) => ({ max, points: raw[k] }));
   }
-  const unknown = Object.keys(raw).filter(
-    (k) => raw[k] && !SCORING_MAP[k] && !/^bonus_(rec_(te|rb|wr)|(pass|rush|rec)_yd_\d+)$/.test(k) && !/^(fgm_|pts_allow_)/.test(k),
-  );
+  const ya: [string, number][] = [
+    ['yds_allow_0_100', 99],
+    ['yds_allow_100_199', 199],
+    ['yds_allow_200_299', 299],
+    ['yds_allow_300_349', 349],
+    ['yds_allow_350_399', 399],
+    ['yds_allow_400_449', 449],
+    ['yds_allow_450_499', 499],
+    ['yds_allow_500_549', 549],
+    ['yds_allow_550p', Number.MAX_SAFE_INTEGER],
+  ];
+  ya.forEach(([k]) => handled.add(k));
+  if (ya.some(([k]) => raw[k])) {
+    rules.yardsAllowedTiers = ya.map(([k, max]) => ({ max, points: raw[k] ?? 0 }));
+  }
+  const unknown = Object.keys(raw).filter((k) => raw[k] && !SCORING_MAP[k] && !handled.has(k) && !/^bonus_rec_(te|rb|wr)$/.test(k));
   if (unknown.length) {
     warnings.push(`We couldn't match ${unknown.length} scoring rule${unknown.length === 1 ? '' : 's'} (${unknown.slice(0, 5).join(', ')}${unknown.length > 5 ? '…' : ''}). Check scoring before the season.`);
   }
@@ -285,6 +405,33 @@ function seasonFromBracket(league: any, rosters: any[], users: any[], bracket: a
       .map((t) => ({ teamName: t.name, ownerName: t.ownerName, wins: t.record!.wins, losses: t.record!.losses, ties: t.record!.ties, pointsFor: t.record!.pointsFor }))
       .sort((a, b) => b.wins - a.wins || b.pointsFor - a.pointsFor),
   };
+}
+
+export type SleeperLeagueSummary = { leagueId: string; name: string; season: string; teams: number; format: string; avatar: string | null };
+
+/**
+ * Find a manager's leagues from their Sleeper username, so nobody has to dig
+ * up a league link. Uses Sleeper's public read-only API (no sign-in needed).
+ */
+export async function findSleeperLeagues(username: string, season: number, opts: { fetch?: Fetch } = {}): Promise<{ displayName: string; leagues: SleeperLeagueSummary[] }> {
+  const fetchImpl = opts.fetch ?? (globalThis.fetch as unknown as Fetch);
+  const name = username.trim().replace(/^@/, '');
+  if (!name) throw new Error('Type your Sleeper username.');
+  const userRes = await fetchImpl(`${API}/user/${encodeURIComponent(name)}`);
+  const user = userRes.ok ? await userRes.json() : null;
+  if (!user?.user_id) throw new Error(`We couldn't find a Sleeper user called ${name}. Check the spelling.`);
+  const leagues: SleeperLeagueSummary[] = [];
+  for (const yr of [season, season - 1]) {
+    const res = await fetchImpl(`${API}/user/${user.user_id}/leagues/nfl/${yr}`);
+    const list = res.ok ? ((await res.json()) as any[]) ?? [] : [];
+    for (const l of list) {
+      if (leagues.some((x) => x.name === l.name)) continue;
+      const type = l.settings?.type;
+      leagues.push({ leagueId: String(l.league_id), name: l.name, season: String(l.season ?? yr), teams: l.total_rosters ?? 0, format: type === 2 ? 'Dynasty' : type === 1 ? 'Keeper' : l.settings?.best_ball ? 'Best ball' : 'Redraft', avatar: l.avatar ?? null });
+    }
+    if (leagues.length) break;
+  }
+  return { displayName: user.display_name ?? name, leagues };
 }
 
 export type SleeperImportOptions = {

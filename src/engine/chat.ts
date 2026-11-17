@@ -38,7 +38,13 @@ export type LeagueEvent =
   | { type: 'close_win'; winner: string; loser: string; margin: number }
   | { type: 'high_score'; team: string; points: number; week: number }
   | { type: 'commissioner_edit'; summary: string }
-  | { type: 'draft_starting'; minutes: number };
+  | { type: 'draft_starting'; minutes: number }
+  | { type: 'free_agent'; team: string; added?: string; dropped?: string }
+  | {
+      type: 'waiver_run';
+      /** Every claim from the run, winners and the bids that came up short. */
+      results: { player: string; winner: string; bid: number; dropped?: string; losers: { team: string; bid: number }[] }[];
+    };
 
 const MENTION = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
@@ -113,5 +119,18 @@ export function eventCopy(event: LeagueEvent, seed = 0): string {
       return `Commissioner update: ${event.summary}. It's in the league log for anyone curious.`;
     case 'draft_starting':
       return event.minutes <= 0 ? 'The draft is live. Good luck, everyone.' : `Draft starts in ${event.minutes} minutes. Get your queues ready.`;
+    case 'free_agent':
+      return event.added && event.dropped
+        ? `${event.team} added ${event.added} and dropped ${event.dropped}.`
+        : event.added
+          ? `${event.team} added ${event.added}.`
+          : `${event.team} dropped ${event.dropped}.`;
+    case 'waiver_run': {
+      const lines = event.results.map((r) => {
+        const lost = r.losers.length ? ` (also bid: ${r.losers.map((l) => `${l.team} $${l.bid}`).join(', ')})` : '';
+        return `${r.winner} won ${r.player} for $${r.bid}${lost}`;
+      });
+      return `Waivers ran. ${lines.join('. ')}.`;
+    }
   }
 }

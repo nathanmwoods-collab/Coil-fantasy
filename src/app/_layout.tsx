@@ -22,12 +22,18 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider style={{ backgroundColor: c.bg }}>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, gestureEnabled: true, fullScreenGestureEnabled: true, animation: 'slide_from_right' }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="create" />
         <Stack.Screen name="import" />
         <Stack.Screen name="trade" options={{ presentation: 'modal' }} />
         <Stack.Screen name="player/[id]" />
+        <Stack.Screen name="settings/index" />
+        <Stack.Screen name="settings/scoring" />
+        <Stack.Screen name="settings/[section]" />
+        <Stack.Screen name="commish/[tool]" />
+        <Stack.Screen name="team/[id]" />
+        <Stack.Screen name="matchup" />
       </Stack>
     </SafeAreaProvider>
   );

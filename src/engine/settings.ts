@@ -322,3 +322,55 @@ export function validateSettings(s: LeagueSettings): SettingsIssue[] {
 
   return issues;
 }
+
+const SETTING_LABELS: Record<string, string> = {
+  name: 'League name',
+  teams: 'Teams',
+  divisions: 'Divisions',
+  regularSeasonWeeks: 'Regular season weeks',
+  lineupLock: 'Lineup lock',
+  autoSubInactive: 'Auto-sub inactive starters',
+  irEligible: 'Who can go on IR',
+  irAllowHealthy: 'Healthy players can stay on IR',
+  'matchups.medianGame': 'Median game',
+  'matchups.type': 'Matchup type',
+  'draft.type': 'Draft type',
+  'draft.rounds': 'Draft rounds',
+  'draft.pickTimerSec': 'Pick timer (seconds)',
+  'draft.orderMethod': 'Draft order',
+  'waivers.type': 'Waiver type',
+  'waivers.faabBudget': 'FAAB budget',
+  'waivers.runDay': 'Waivers run on',
+  'waivers.holdDays': 'Days on waivers',
+  'trades.review': 'Trade review',
+  'trades.deadlineWeek': 'Trade deadline week',
+  'trades.futurePickSeasons': 'Seasons of tradable picks',
+  'playoffs.teams': 'Playoff teams',
+  'playoffs.startWeek': 'Playoffs start week',
+  'playoffs.weeksPerRound': 'Weeks per playoff round',
+  'playoffs.reseed': 'Reseed each round',
+  'playoffs.consolation': 'Consolation bracket',
+  'playoffs.toiletBowl': 'Toilet bowl',
+  'dynasty.taxiSlots': 'Taxi squad spots',
+  'dynasty.rookieDraftRounds': 'Rookie draft rounds',
+  'keepers.maxPerTeam': 'Keepers per team',
+};
+
+/** Every non-scoring setting that changed, in plain words, for the league notice. */
+export function describeSettingsChanges(before: LeagueSettings, after: LeagueSettings): string[] {
+  const out: string[] = [];
+  const show = (v: unknown) => (Array.isArray(v) ? v.join(', ') || 'none' : v === null ? 'none' : typeof v === 'boolean' ? (v ? 'on' : 'off') : String(v));
+  const walk = (a: unknown, b: unknown, path: string) => {
+    if (path === 'scoring' || path === 'scoringPreset') return;
+    if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a)) {
+      const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+      for (const k of keys) walk((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], path ? `${path}.${k}` : k);
+      return;
+    }
+    if (JSON.stringify(a) === JSON.stringify(b)) return;
+    const label = SETTING_LABELS[path] ?? (path.startsWith('roster.') ? `${path.slice(7)} spots` : path);
+    out.push(`${label}: ${show(a ?? 0)} → ${show(b ?? 0)}`);
+  };
+  walk(before, after, '');
+  return out;
+}

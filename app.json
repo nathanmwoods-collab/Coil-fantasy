@@ -29,6 +29,13 @@
         {
           "asyncRoutes": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Coil uses your photos so you can set team and league images.",
+          "cameraPermission": "Coil uses your camera so you can take a team or league photo."
+        }
       ]
     ],
     "scheme": "coilfantasy",

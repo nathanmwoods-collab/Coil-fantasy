@@ -10,3 +10,4 @@ export * from './waivers';
 export * from './trades';
 export * from './projections';
 export * from './chat';
+export * from './scoringCatalog';

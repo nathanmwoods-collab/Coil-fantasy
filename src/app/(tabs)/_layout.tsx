@@ -9,11 +9,12 @@ const icon = (glyph: string) => ({ color }: { color: ColorValue }) => <Text styl
 
 export default function TabsLayout() {
   const queue = useApp((s) => s.queue.length);
+  const isAdmin = useApp((s) => s.isAppAdmin);
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, height: 64, paddingTop: 6, paddingBottom: 10 },
+        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, height: 74, paddingTop: 6, paddingBottom: 14 },
         tabBarActiveTintColor: c.accent,
         tabBarInactiveTintColor: c.textMuted,
         tabBarLabelStyle: { fontFamily: type.label.fontFamily, fontSize: 11 },
@@ -23,7 +24,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="league" options={{ title: 'League', tabBarIcon: icon('🏆') }} />
       <Tabs.Screen name="team" options={{ title: 'My team', tabBarIcon: icon('🐍') }} />
       <Tabs.Screen name="chat" options={{ title: 'Chat', tabBarIcon: icon('💬') }} />
-      <Tabs.Screen name="admin" options={{ title: 'Admin', tabBarIcon: icon('🛡'), tabBarBadge: queue || undefined }} />
+      <Tabs.Screen name="admin" options={{ title: 'News desk', tabBarIcon: icon('🛡'), tabBarBadge: queue || undefined, href: isAdmin ? undefined : null }} />
     </Tabs>
   );
 }
