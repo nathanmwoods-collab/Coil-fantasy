@@ -4,6 +4,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 
 import { TeamAvatar } from '../../components/league';
 import { Reactions } from '../../components/Reactions';
+import { TeamDepth } from '../../components/TeamDepth';
 import { Button, c, Card, InjuryBadge, Input, PlayerAvatar, POS_COLORS, Screen, Segmented, T } from '../../components/ui';
 import { ageOf, CURRENT_SEASON, CURRENT_WEEK, heightLabel, ME } from '../../demo/league';
 import { fullStatLine, nflGame, ownership, playerWeek, snapShare, statSummary } from '../../demo/games';
@@ -266,28 +267,7 @@ export default function PlayerCard() {
         </>
       )}
 
-      {tab === 'team' && (
-        <Card style={{ paddingVertical: 4 }}>
-          <T style={[type.title, { paddingVertical: 8 }]}>{nfl ? `${nfl.city} ${nfl.name}` : p.nflTeam}</T>
-          {data.teammates.length ? (
-            data.teammates.map((x) => {
-              const own = L.teams.find((t) => t.players.includes(x.id));
-              return (
-                <Pressable key={x.id} onPress={() => router.push(`/player/${x.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border }}>
-                  <PlayerAvatar name={x.name} position={x.position} size={30} />
-                  <View style={{ flex: 1 }}>
-                    <T style={type.smallStrong}>{x.name} <T style={[type.micro, { color: POS_COLORS[x.position] }]}>{x.position}</T></T>
-                    <T muted style={type.micro}>{own ? own.name : 'Free agent'}</T>
-                  </View>
-                  <InjuryBadge status={x.status} />
-                </Pressable>
-              );
-            })
-          ) : (
-            <T muted style={{ paddingVertical: 10 }}>No other fantasy-relevant players on this team in the preview.</T>
-          )}
-        </Card>
-      )}
+      {tab === 'team' && <TeamDepth L={L} player={p} />}
 
       {tab === 'history' && (
         <Card>
