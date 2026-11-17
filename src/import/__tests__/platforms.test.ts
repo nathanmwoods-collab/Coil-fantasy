@@ -28,7 +28,7 @@ describe('ESPN import', () => {
     expect(me.players[0]).toMatchObject({ name: "Ja'Marr Chase", position: 'WR', nflTeam: 'CIN', slot: 'active' });
     expect(me.players[1].slot).toBe('IR');
     expect(L.teams[1].name).toBe('Tacos Al Pastor');
-    expect(L.warnings.some((w) => w.includes('scoring rules'))).toBe(true);
+    expect(L.warnings.some((w) => w.includes('scoring rule'))).toBe(true);
   });
 
   it('explains a private league', async () => {
