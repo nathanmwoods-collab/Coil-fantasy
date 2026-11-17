@@ -2,14 +2,14 @@
 // Admins approve, review or block any source (and add new ones) in the Admin
 // area; this is only the starting list.
 //
-// Beat writers change outlets often, so team groups start with the official
-// team source only. The first monthly audit suggests each team's current beat
-// writers for an admin to approve, rather than shipping a list that may
-// already be out of date.
+// Beat writers come from researched bylines (src/news/beatWriters.ts, rebuilt
+// with scripts/import-beat-writers.py). They all start in review; writers we
+// could only lightly confirm are marked "unverified".
 //
 // X accounts need the paid X API (or a licensed relay) to read in real time;
 // RSS and team sites are free.
 
+import { BEAT_WRITERS } from './beatWriters';
 import type { NewsSource, SourceTrust } from './pipeline';
 
 export const NFL_TEAMS: Record<string, { city: string; name: string; aliases: string[] }> = {
@@ -58,6 +58,8 @@ const x = (handle: string, name: string, trust: SourceTrust, tier: NewsSource['t
   role,
 });
 
+const INSIDER_NAMES = new Set(['Adam Schefter', 'Ian Rapoport', 'Tom Pelissero', 'Mike Garafolo', 'Jeremy Fowler', 'Field Yates']);
+
 export const DEFAULT_SOURCES: NewsSource[] = [
   // National: insiders are trusted and auto-push when the match is confident.
   x('AdamSchefter', 'Adam Schefter', 'trusted', 'insider', 'NFL insider, ESPN'),
@@ -82,6 +84,8 @@ export const DEFAULT_SOURCES: NewsSource[] = [
       role: 'Official team news',
     }),
   ),
+  // Researched beat writers and insiders. All start in review for an admin to approve or block.
+  ...BEAT_WRITERS.filter((b) => !(b.category === 'national' && INSIDER_NAMES.has(b.name))).map(({ verifiedFrom: _v, ...b }) => b),
 ];
 
 /** Sources grouped for the Admin screen: National first, then teams A to Z. */

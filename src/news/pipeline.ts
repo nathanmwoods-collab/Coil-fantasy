@@ -27,7 +27,7 @@ export type NewsSource = {
   tier: SourceTier;
   trust: SourceTrust;
   url: string;
-  kind: 'rss' | 'team_site' | 'x' | 'wire';
+  kind: 'rss' | 'team_site' | 'x' | 'wire' | 'web';
   /** "national", or the NFL team a beat writer covers (e.g. "BUF"). */
   category: 'national' | string;
   /** What they do, e.g. "Bills beat writer, The Buffalo News". */
