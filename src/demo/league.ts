@@ -118,8 +118,9 @@ export function demoPlayers(): Record<string, DemoPlayer> {
 export type DemoLeague = {
   id: string;
   name: string;
-  /** Uploaded league image; falls back to the Coil mark. */
+  /** Uploaded league image; falls back to the emoji, then the Coil mark. */
   imageUri?: string;
+  emoji?: string;
   settings: LeagueSettings;
   teams: DemoTeam[];
   /** Team ids whose managers are commissioners. */

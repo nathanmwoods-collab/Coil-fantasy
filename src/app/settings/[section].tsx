@@ -2,7 +2,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, Switch, View } from 'react-native';
 
-import { pickImage, TeamAvatar } from '../../components/league';
+import { ImageEditor } from '../../components/ImageEditor';
+import { TeamAvatar } from '../../components/league';
 import { SettingsEditor, type SettingsSection } from '../../components/SettingsEditor';
 import { Button, c, Card, Chip, H1, InjuryBadge, Input, Row, Screen, Stepper, T } from '../../components/ui';
 import { CURRENT_SEASON, ME } from '../../demo/league';
@@ -51,6 +52,7 @@ export default function SettingsSectionScreen() {
   const [duesAmt, setDuesAmt] = useState(L.dues?.amount ?? 50);
   const [season, setSeason] = useState(CURRENT_SEASON - 1);
   const [champ, setChamp] = useState('');
+  const [lookOpen, setLookOpen] = useState(false);
   const [title, sub] = TITLES[section] ?? ['Settings', ''];
   const editable = ['roster', 'draft', 'moves', 'playoffs', 'league', 'divisions'].includes(section);
   const changes = editable ? describeSettingsChanges(L.settings, draft) : [];
@@ -77,30 +79,28 @@ export default function SettingsSectionScreen() {
         <>
           <Card style={{ alignItems: 'center' }}>
             <Pressable
-              onPress={async () => {
-                const uri = await pickImage();
-                if (uri) {
-                  st.updateMyTeam({ imageUri: uri });
-                  st.showToast('New team image. Looking sharp.');
-                }
-              }}
+              onPress={() => setLookOpen(true)}
             >
               <TeamAvatar team={me} size={96} />
             </Pressable>
-            <T style={[type.smallStrong, { color: c.accent, marginTop: 8 }]}>{me.imageUri ? 'Change image' : 'Upload a team image'}</T>
-            {me.imageUri ? (
-              <Pressable onPress={() => st.updateMyTeam({ imageUri: undefined })}>
-                <T muted style={[type.small, { marginTop: 4 }]}>Use the emoji instead</T>
-              </Pressable>
-            ) : null}
+            <Pressable onPress={() => setLookOpen(true)}>
+              <T style={[type.smallStrong, { color: c.accent, marginTop: 8 }]}>Change picture</T>
+            </Pressable>
+            <ImageEditor
+              visible={lookOpen}
+              title="Team picture"
+              current={{ emoji: me.emoji, imageUri: me.imageUri }}
+              onClose={() => setLookOpen(false)}
+              onDone={(look) => {
+                st.setTeamLook(ME, look);
+                setLookOpen(false);
+                st.showToast('New team picture. Looking sharp.');
+              }}
+            />
           </Card>
           <Card>
             <T muted style={type.label}>TEAM NAME</T>
             <Input value={teamName} onChangeText={setTeamName} style={{ marginTop: 6 }} />
-            <T muted style={[type.label, { marginTop: 12 }]}>EMOJI</T>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
-              {['🐍', '🔥', '🦅', '🐐', '🍕', '🦖', '⚡️', '🧊', '🌮', '👑'].map((e) => <Chip key={e} label={e} active={me.emoji === e} onPress={() => st.updateMyTeam({ emoji: e })} />)}
-            </View>
             <View style={{ height: 10 }} />
             <Button label="Save name" disabled={!teamName.trim() || teamName === me.name} onPress={() => { st.renameTeam(ME, teamName.trim()); st.showToast('Renamed. The league will see it in chat.'); }} />
           </Card>
@@ -325,9 +325,11 @@ export default function SettingsSectionScreen() {
             ['🧢', 'Commissioner'],
             ['proj', 'Projection. During games it updates with what has already happened'],
             ['▲ ▼', 'Rank moves after a rule change'],
-          ].map(([k, v]) => (
+            ['@NYG', 'Red opponent: one of the toughest defenses against that position'],
+            ['@DAL', 'Green opponent: one of the easiest'],
+          ].map(([k, v], i) => (
             <View key={k} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border }}>
-              <T style={[type.smallStrong, { width: 44 }]}>{k}</T>
+              <T style={[type.smallStrong, { width: 44 }, k === '@NYG' ? { color: c.danger } : k === '@DAL' ? { color: c.success } : null]}>{k}</T>
               <T style={{ flex: 1 }}>{v}</T>
             </View>
           ))}

@@ -191,3 +191,20 @@ export function snapShare(p: Player & { proj: number }, week: number): number {
   const base = Math.min(0.97, 0.35 + p.proj / 420);
   return Math.round(Math.max(0.05, Math.min(1, base + (rnd() - 0.5) * 0.18)) * 100);
 }
+
+/**
+ * How tough an NFL defense is against a fantasy position, 1 (allows the
+ * fewest points) to 32 (allows the most). Seeded for the preview; the app
+ * computes it from points allowed to each position this season.
+ */
+export function defenseRank(defense: string, position: string): number {
+  let h = 7;
+  for (const ch of `${defense}:${position}`) h = (h * 33 + ch.charCodeAt(0)) >>> 0;
+  return (h % 32) + 1;
+}
+
+/** Red for the hardest matchups, green for the easiest, plain in between. */
+export function matchupColor(defense: string, position: string, colors: { hard: string; easy: string; neutral: string }): string {
+  const r = defenseRank(defense, position);
+  return r <= 10 ? colors.hard : r >= 23 ? colors.easy : colors.neutral;
+}

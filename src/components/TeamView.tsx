@@ -1,13 +1,14 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Modal, Pressable, TextInput, View } from 'react-native';
 
 import { CURRENT_WEEK, ME, opponentOf, teamWeek } from '../demo/league';
-import { ownership, playerWeek, statSummary, winProbability, type PlayerWeek } from '../demo/games';
+import { defenseRank, matchupColor, ownership, playerWeek, statSummary, winProbability, type PlayerWeek } from '../demo/games';
 import { injuryTag, irEligible, SLOT_LABELS, taxiEligible, type SlotType } from '../engine';
 import { isCommish, useApp } from '../store/useApp';
 import { type } from '../theme/type';
-import { LeagueHeader, pickImage, TeamAvatar } from './league';
+import { ImageEditor } from './ImageEditor';
+import { LeagueHeader, TeamAvatar } from './league';
 import { Button, c, Card, Chip, H2, InjuryBadge, PlayerAvatar, POS_COLORS, T } from './ui';
 
 const ordinal = (n: number) => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] ?? ['th', 'st', 'nd', 'rd'][n % 100] ?? 'th');
@@ -18,7 +19,11 @@ export function TeamView({ teamId }: { teamId: string }) {
   const activate = useApp((s) => s.activateFromIR);
   const moveToTaxi = useApp((s) => s.moveToTaxi);
   const promote = useApp((s) => s.promoteFromTaxi);
-  const updateMyTeam = useApp((s) => s.updateMyTeam);
+  const setTeamLook = useApp((s) => s.setTeamLook);
+  const renameTeam = useApp((s) => s.renameTeam);
+  const [lookOpen, setLookOpen] = useState(false);
+  const [naming, setNaming] = useState<string | null>(null);
+  const [teamsOpen, setTeamsOpen] = useState(false);
   const toast = useApp((s) => s.showToast);
   const [open, setOpen] = useState<string | null>(null);
   const [week, setWeek] = useState(CURRENT_WEEK);
@@ -26,6 +31,7 @@ export function TeamView({ teamId }: { teamId: string }) {
 
   const team = L.teams.find((t) => t.id === teamId)!;
   const mine = teamId === ME;
+  const canEditLook = mine || isCommish(L);
   const tw = useMemo(() => teamWeek(L, teamId, week), [L, teamId, week]);
   const oppId = opponentOf(L, teamId, week);
   const opp = oppId ? L.teams.find((t) => t.id === oppId) : null;
@@ -50,8 +56,10 @@ export function TeamView({ teamId }: { teamId: string }) {
     const result = !g
       ? 'Bye week'
       : g.status === 'upcoming'
-        ? `${g.clock} ${g.home ? 'vs' : '@'} ${g.opp}`
-        : `${g.status === 'final' ? (g.teamScore > g.oppScore ? 'W' : g.teamScore < g.oppScore ? 'L' : 'T') : g.clock} ${g.teamScore}-${g.oppScore} ${g.home ? 'vs' : '@'} ${g.opp}`;
+        ? `${g.clock} `
+        : `${g.status === 'final' ? (g.teamScore > g.oppScore ? 'W' : g.teamScore < g.oppScore ? 'L' : 'T') : g.clock} ${g.teamScore}-${g.oppScore} `;
+    const oppTone = g ? matchupColor(g.opp, p.position, { hard: c.danger, easy: c.success, neutral: c.text }) : c.text;
+    const oppRank = g ? defenseRank(g.opp, p.position) : 0;
     const resultColor = !g || g.status === 'upcoming' ? c.textMuted : g.status === 'live' ? c.warning : g.teamScore >= g.oppScore ? c.success : c.danger;
     const line = pw ? statSummary(p.position, pw.stats) : '';
     return (
@@ -71,7 +79,10 @@ export function TeamView({ teamId }: { teamId: string }) {
             <T muted style={type.micro}>
               {own.rostered}% rostered · {own.started}% start{p.yearsPro === 0 ? ' · rookie' : ''}
             </T>
-            <T style={[type.micro, { color: resultColor }]}>{result}</T>
+            <T style={[type.micro, { color: resultColor }]}>
+              {result}
+              {g ? <T style={[type.micro, { color: oppTone }]}>{g.home ? 'vs' : '@'} {g.opp}</T> : null}
+            </T>
             {line ? <T muted style={[type.micro, { fontFamily: type.num.fontFamily }]}>{line}</T> : null}
           </View>
           <View style={{ alignItems: 'flex-end', minWidth: 54 }}>
@@ -88,30 +99,40 @@ export function TeamView({ teamId }: { teamId: string }) {
   return (
     <>
       <LeagueHeader />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-        {L.teams.map((t) => (
-          <Pressable key={t.id} onPress={() => (t.id === teamId ? null : t.id === ME ? router.push('/team') : router.push(`/team/${t.id}`))} style={{ opacity: t.id === teamId ? 1 : 0.55, borderRadius: 12, borderWidth: t.id === teamId ? 2 : 0, borderColor: c.primary }} accessibilityLabel={t.name}>
-            <TeamAvatar team={t} size={30} />
-          </Pressable>
-        ))}
-      </View>
       <Card highlight={mine}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Pressable
-            disabled={!mine}
-            onPress={async () => {
-              const uri = await pickImage();
-              if (uri) {
-                updateMyTeam({ imageUri: uri });
-                toast('New team image. Looking sharp.');
-              }
-            }}
-          >
+          <Pressable disabled={!canEditLook} onPress={() => setLookOpen(true)} accessibilityLabel="Change team picture">
             <TeamAvatar team={team} size={58} />
-            {mine ? <T style={{ position: 'absolute', right: -4, bottom: -4, fontSize: 14 }}>📷</T> : null}
+            {canEditLook ? <T style={{ position: 'absolute', right: -4, bottom: -4, fontSize: 14 }}>📷</T> : null}
           </Pressable>
           <View style={{ flex: 1 }}>
-            <T style={type.title} numberOfLines={1}>{team.name}</T>
+            {naming !== null ? (
+              <TextInput
+                autoFocus
+                value={naming}
+                onChangeText={setNaming}
+                maxLength={32}
+                selectTextOnFocus
+                onBlur={() => setNaming(null)}
+                onSubmitEditing={() => {
+                  const n = naming.trim();
+                  if (n && n !== team.name) {
+                    renameTeam(teamId, n);
+                    toast('Renamed. The league will see it in chat.');
+                  }
+                  setNaming(null);
+                }}
+                returnKeyType="done"
+                style={[type.title, { color: c.text, borderBottomWidth: 1, borderBottomColor: c.accent, paddingVertical: 0 }]}
+              />
+            ) : (
+              <Pressable disabled={!mine} onPress={() => setNaming(team.name)} accessibilityLabel="Rename team">
+                <T style={type.title} numberOfLines={1}>
+                  {team.name}
+                  {mine ? <T muted style={type.small}>  ✎</T> : null}
+                </T>
+              </Pressable>
+            )}
             <T muted style={type.small}>
               {team.manager}
               {isCommish(L) && L.commissioners.includes(teamId) ? ' · Commish' : ''}
@@ -120,6 +141,9 @@ export function TeamView({ teamId }: { teamId: string }) {
             <T style={[type.smallStrong, { marginTop: 2 }]}>
               {rec.wins}-{rec.losses}{rec.ties ? `-${rec.ties}` : ''} · {ordinal(place)}
               <T muted style={type.small}> · PF {ordinal(rankBy((r) => r.pointsFor))} · PA {ordinal(rankBy((r) => r.pointsAgainst))}</T>
+            </T>
+            <T muted style={type.micro}>
+              {L.settings.waivers.type === 'faab' ? `$${team.faab} FAAB left · ` : ''}Waiver #{team.waiverPriority}
             </T>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
@@ -141,11 +165,49 @@ export function TeamView({ teamId }: { teamId: string }) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 12 }}>
           <Chip label="Lineup" active={section === 'lineup'} onPress={() => setSection('lineup')} />
           <Chip label="Schedule" active={section === 'schedule'} onPress={() => setSection('schedule')} />
-          <Chip label="Trade" onPress={() => router.push('/trade')} />
-          {L.settings.waivers.type === 'faab' ? <Chip label={`$${team.faab} FAAB`} /> : null}
-          <Chip label={`Waiver #${team.waiverPriority}`} />
+          <Chip label={mine ? 'Trade' : 'Propose trade'} onPress={() => router.push(mine ? '/trade' : `/trade?partner=${teamId}`)} />
+          <Chip label="Other teams ▾" onPress={() => setTeamsOpen(true)} />
         </View>
       </Card>
+      <ImageEditor
+        visible={lookOpen}
+        title={mine ? 'Your team picture' : `${team.name} picture`}
+        current={{ emoji: team.emoji, imageUri: team.imageUri }}
+        onClose={() => setLookOpen(false)}
+        onDone={(look) => {
+          setTeamLook(teamId, look);
+          setLookOpen(false);
+          toast(mine ? 'New team picture. Looking sharp.' : 'Picture updated. The league will see a note in chat.');
+        }}
+      />
+      <Modal visible={teamsOpen} transparent animationType="fade" onRequestClose={() => setTeamsOpen(false)}>
+        <Pressable onPress={() => setTeamsOpen(false)} style={{ flex: 1, backgroundColor: '#000A', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: c.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: 34, maxWidth: 640, width: '100%', alignSelf: 'center' }}>
+            <T style={[type.display24, { marginBottom: 10 }]}>Teams</T>
+            {L.standings.map((row, i) => {
+              const t = L.teams.find((x) => x.id === row.teamId)!;
+              return (
+                <Pressable
+                  key={t.id}
+                  onPress={() => {
+                    setTeamsOpen(false);
+                    if (t.id !== teamId) router.push(t.id === ME ? '/team' : `/team/${t.id}`);
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border, opacity: t.id === teamId ? 0.5 : 1 }}
+                >
+                  <T muted style={[type.num, { width: 20 }]}>{i + 1}</T>
+                  <TeamAvatar team={t} size={28} />
+                  <View style={{ flex: 1 }}>
+                    <T style={type.smallStrong} numberOfLines={1}>{t.name}{t.id === ME ? ' (you)' : ''}</T>
+                    <T muted style={type.micro}>{t.manager}</T>
+                  </View>
+                  <T muted style={type.num}>{row.wins}-{row.losses}</T>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
 
       {section === 'schedule' ? (
         <Card style={{ paddingVertical: 4 }}>

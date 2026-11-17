@@ -39,6 +39,9 @@ type AppState = {
   createdLeagues: LeagueSettings[];
   lastImport: { league: ImportedLeague; migration: Migration } | null;
   toast: string | null;
+  /** League switcher sheet, opened from any league header or a long press on the League tab. */
+  switcherOpen: boolean;
+  setSwitcherOpen: (open: boolean) => void;
 
   showToast: (msg: string) => void;
   switchLeague: (id: string) => void;
@@ -60,6 +63,9 @@ type AppState = {
   // My team and league identity
   updateMyTeam: (patch: Partial<Pick<DemoTeam, 'name' | 'emoji' | 'imageUri'>>) => void;
   setLeagueImage: (uri: string | undefined) => void;
+  /** Owner (or a commissioner) sets a team's icon or photo. */
+  setTeamLook: (teamId: string, look: { emoji?: string; imageUri?: string }) => void;
+  setLeagueLook: (look: { emoji?: string; imageUri?: string }) => void;
 
   // Commissioner tools. Every change posts a notice in league chat.
   updateSettings: (next: LeagueSettings) => string[];
@@ -113,6 +119,8 @@ export const useApp = create<AppState>((set, get) => {
     createdLeagues: [],
     lastImport: null,
     toast: null,
+    switcherOpen: false,
+    setSwitcherOpen: (open) => set({ switcherOpen: open }),
 
     showToast: (msg) => {
       set({ toast: msg });
@@ -226,6 +234,12 @@ export const useApp = create<AppState>((set, get) => {
 
     updateMyTeam: (patch) => update((L) => mapTeam(L, ME, (t) => ({ ...t, ...patch }))),
     setLeagueImage: (uri) => update((L) => notice({ ...L, imageUri: uri }, uri ? 'new league image' : 'league image removed')),
+    setTeamLook: (teamId, look) =>
+      update((L) => {
+        const next = mapTeam(L, teamId, (t) => ({ ...t, emoji: look.emoji ?? t.emoji, imageUri: look.imageUri }));
+        return teamId === ME ? next : notice(next, `new picture for ${teamName(L, teamId)}`);
+      }),
+    setLeagueLook: (look) => update((L) => notice({ ...L, emoji: 'emoji' in look ? look.emoji : L.emoji, imageUri: look.imageUri }, 'new league picture')),
 
     updateSettings: (next) => {
       const L = get().league;

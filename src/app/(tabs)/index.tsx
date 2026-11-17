@@ -46,18 +46,24 @@ export default function Home() {
               </View>
             </View>
             {opp && theirs ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: c.border }}>
-                <TeamAvatar team={me} size={26} />
-                <View style={{ marginLeft: 8 }}>
-                  <T style={[type.num, { fontSize: 18, color: mine.points >= theirs.points ? c.text : c.textMuted }]}>{mine.points.toFixed(2)}</T>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: c.border }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <TeamAvatar team={me} size={22} />
+                    <T muted style={[type.micro, { flex: 1 }]} numberOfLines={1}>{me.name}</T>
+                  </View>
+                  <T style={[type.num, { fontSize: 18, marginTop: 4, color: mine.points >= theirs.points ? c.text : c.textMuted }]}>{mine.points.toFixed(2)}</T>
                   <T muted style={type.micro}>proj {mine.liveProjected.toFixed(1)}</T>
                 </View>
-                <T muted style={[type.small, { flex: 1, textAlign: 'center' }]}>vs</T>
-                <View style={{ alignItems: 'flex-end', marginRight: 8 }}>
-                  <T style={[type.num, { fontSize: 18, color: theirs.points > mine.points ? c.text : c.textMuted }]}>{theirs.points.toFixed(2)}</T>
+                <T muted style={type.small}>vs</T>
+                <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <T muted style={[type.micro, { flexShrink: 1, textAlign: 'right' }]} numberOfLines={1}>{opp.name}</T>
+                    <TeamAvatar team={opp} size={22} />
+                  </View>
+                  <T style={[type.num, { fontSize: 18, marginTop: 4, color: theirs.points > mine.points ? c.text : c.textMuted }]}>{theirs.points.toFixed(2)}</T>
                   <T muted style={type.micro}>proj {theirs.liveProjected.toFixed(1)}</T>
                 </View>
-                <TeamAvatar team={opp} size={26} />
               </View>
             ) : null}
           </Card>

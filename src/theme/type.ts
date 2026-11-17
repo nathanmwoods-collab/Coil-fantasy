@@ -3,7 +3,7 @@ import type { TextStyle } from 'react-native';
 /**
  * Coil type system (personality spec §2.7).
  * Big Shoulders for display and big numbers, Schibsted Grotesk for UI,
- * DM Mono for numeric columns so digits don't jitter.
+ * Numbers use the UI face (DM Mono spaced decimals too widely).
  * Custom families carry their own weight: never pair them with `fontWeight`.
  */
 export const fonts = {
@@ -26,5 +26,5 @@ export const type = {
   smallStrong: { fontFamily: fonts.strong, fontSize: 13, lineHeight: 18 },
   label: { fontFamily: fonts.strong, fontSize: 11, lineHeight: 14 },
   micro: { fontFamily: fonts.body, fontSize: 11, lineHeight: 14 },
-  num: { fontFamily: fonts.mono, fontSize: 13, fontVariant: ['tabular-nums'] },
+  num: { fontFamily: fonts.strong, fontSize: 13 },
 } satisfies Record<string, TextStyle>;

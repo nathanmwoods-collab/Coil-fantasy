@@ -2,7 +2,8 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { LeagueAvatar, leagueKicker, pickImage } from '../../components/league';
+import { ImageEditor } from '../../components/ImageEditor';
+import { LeagueAvatar, leagueKicker } from '../../components/league';
 import { draftSummary, irSummary, playoffSummary, rosterSummary, scoringSummary, tradeSummary, waiverSummary } from '../../components/summaries';
 import { c, Card, H1, Screen, Segmented, T } from '../../components/ui';
 import { ME } from '../../demo/league';
@@ -13,7 +14,8 @@ type Item = { icon: string; title: string; sub: string; href: string; danger?: b
 
 export default function Settings() {
   const L = useApp((s) => s.league);
-  const setLeagueImage = useApp((s) => s.setLeagueImage);
+  const setLeagueLook = useApp((s) => s.setLeagueLook);
+  const [editing, setEditing] = useState(false);
   const toast = useApp((s) => s.showToast);
   const commish = isCommish(L);
   const [tab, setTab] = useState<'general' | 'commish'>('general');
@@ -89,13 +91,7 @@ export default function Settings() {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 }}>
         <Pressable
           disabled={!commish}
-          onPress={async () => {
-            const uri = await pickImage();
-            if (uri) {
-              setLeagueImage(uri);
-              toast('New league image. Everyone will see it.');
-            }
-          }}
+          onPress={() => setEditing(true)}
         >
           <LeagueAvatar league={L} size={56} />
           {commish ? <T style={{ position: 'absolute', right: -4, bottom: -4, fontSize: 14 }}>📷</T> : null}
@@ -104,6 +100,19 @@ export default function Settings() {
           <H1 kicker="League settings">{L.name}</H1>
         </View>
       </View>
+      <ImageEditor
+        visible={editing}
+        title="League picture"
+        current={{ emoji: L.emoji, imageUri: L.imageUri }}
+        defaultLabel="Coil mark"
+        emojiChoices={['🏆', '🐍', '🏈', '🔥', '👑', '🍺', '💰', '🎯', '🦅', '🐐', '⚡️', '💀']}
+        onClose={() => setEditing(false)}
+        onDone={(look) => {
+          setLeagueLook(look);
+          setEditing(false);
+          toast('New league picture. Everyone will see it.');
+        }}
+      />
       {L.commishNote ? (
         <Card style={{ borderColor: c.accent }}>
           <T style={[type.label, { color: c.accent }]}>📌 FROM THE COMMISH</T>

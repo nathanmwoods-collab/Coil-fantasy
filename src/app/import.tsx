@@ -7,6 +7,9 @@ import { CURRENT_SEASON } from '../demo/league';
 import { pickLabel } from '../engine';
 import { SLEEPER_DEMO_PLAYER_DB, SLEEPER_DEMO_USERNAME, sleeperDemoFetch } from '../import/fixtures/sleeperDemo';
 import { claimTeam, migrationMessage, migrationProgress, startMigration } from '../import/migrate';
+import { ESPN_SAMPLE_LEAGUE_ID, espnSampleFetch, MFL_SAMPLE_LEAGUE_ID, mflSampleFetch } from '../import/fixtures/platformSamples';
+import { importEspnLeague } from '../import/espn';
+import { importMflLeague } from '../import/mfl';
 import { findSleeperLeagues, importSleeperLeague, type SleeperLeagueSummary } from '../import/sleeper';
 import { importFromText } from '../import/text';
 import type { ImportedLeague } from '../import/types';
@@ -19,9 +22,9 @@ type Source = 'sleeper' | 'paste' | 'espn' | 'yahoo' | 'mfl' | 'fleaflicker';
 const SOURCES: { key: Source; label: string; how: string; ready: boolean }[] = [
   { key: 'sleeper', label: 'Sleeper', how: 'Type your Sleeper username and pick the league.', ready: true },
   { key: 'paste', label: 'Anywhere else', how: 'Paste rosters from any site or spreadsheet. We match every name.', ready: true },
-  { key: 'espn', label: 'ESPN', how: 'Sign in to ESPN once so we can read your private league.', ready: false },
-  { key: 'yahoo', label: 'Yahoo', how: 'Approve Coil in Yahoo and pick your league.', ready: false },
-  { key: 'mfl', label: 'MyFantasyLeague', how: 'Paste your league link. Contracts and salaries included.', ready: false },
+  { key: 'espn', label: 'ESPN', how: 'Paste your league link. Private league? Sign in to ESPN once.', ready: true },
+  { key: 'yahoo', label: 'Yahoo', how: 'Sign in with Yahoo, approve read-only access, pick your league.', ready: false },
+  { key: 'mfl', label: 'MyFantasyLeague', how: 'Paste your league link. Taxi, IR, contracts and traded picks come too.', ready: true },
   { key: 'fleaflicker', label: 'Fleaflicker', how: 'Paste your league link.', ready: false },
 ];
 
@@ -43,6 +46,25 @@ Christian McCaffery
 Justin Jefferson
 FAAB: 0`;
 
+const isSampleUser = (u: string) => u.trim().replace(/^@/, '').toLowerCase() === SLEEPER_DEMO_USERNAME;
+const liveFetch = (url: string) => fetch(url);
+const sleeperFetchFor = (u: string) => (isSampleUser(u) ? sleeperDemoFetch : liveFetch);
+let playerCache: Record<string, any> | null = null;
+async function loadSleeperPlayers() {
+  if (playerCache) return playerCache;
+  const res = await fetch('https://api.sleeper.app/v1/players/nfl');
+  playerCache = res.ok ? await res.json() : null;
+  return playerCache;
+}
+/** A blocked or offline request throws a bare TypeError; say what actually happened. */
+function friendlyNetworkError(e: unknown): string {
+  const msg = (e as Error)?.message ?? String(e);
+  if (e instanceof TypeError || /fetch|network|load failed/i.test(msg)) {
+    return `We couldn't reach Sleeper from here. This preview page may block outside connections; the app won't. Try the sample username "${SLEEPER_DEMO_USERNAME}" to see the flow.`;
+  }
+  return msg;
+}
+
 export default function Import() {
   const playerMap = useApp((s) => s.league.players);
   const players = useMemo(() => Object.values(playerMap), [playerMap]);
@@ -50,7 +72,7 @@ export default function Import() {
   const last = useApp((s) => s.lastImport);
   const toast = useApp((s) => s.showToast);
   const [source, setSource] = useState<Source | null>(null);
-  const [username, setUsername] = useState(SLEEPER_DEMO_USERNAME);
+  const [username, setUsername] = useState('');
   const [found, setFound] = useState<{ displayName: string; leagues: SleeperLeagueSummary[] } | null>(null);
   const [text, setText] = useState(SAMPLE);
   const [result, setResult] = useState<{ league: ImportedLeague; review: { teamName: string; raw: string; suggestion?: string }[] } | null>(null);
@@ -62,10 +84,10 @@ export default function Import() {
     setBusy(true);
     setError(null);
     try {
-      // The preview can't reach Sleeper, so it answers with sample data in Sleeper's exact format.
-      setFound(await findSleeperLeagues(username, CURRENT_SEASON, { fetch: sleeperDemoFetch }));
+      // Real usernames go to Sleeper's public API. The sample username answers from saved data.
+      setFound(await findSleeperLeagues(username, CURRENT_SEASON, { fetch: sleeperFetchFor(username) }));
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyNetworkError(e));
     } finally {
       setBusy(false);
     }
@@ -75,10 +97,32 @@ export default function Import() {
     setBusy(true);
     setError(null);
     try {
-      const league = await importSleeperLeague(leagueId, { fetch: sleeperDemoFetch, playerDb: SLEEPER_DEMO_PLAYER_DB });
+      const sample = isSampleUser(username);
+      const fetchImpl = sleeperFetchFor(username);
+      // Sleeper's player list is large (~5 MB). The app caches it daily on our server; the preview loads it once.
+      const playerDb = sample ? SLEEPER_DEMO_PLAYER_DB : await loadSleeperPlayers();
+      const league = await importSleeperLeague(leagueId, { fetch: fetchImpl, playerDb });
       setResult({ league, review: [] });
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyNetworkError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const [link, setLink] = useState('');
+  const runLink = async (kind: 'espn' | 'mfl', sample = false) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const league =
+        kind === 'espn'
+          ? await importEspnLeague(sample ? ESPN_SAMPLE_LEAGUE_ID : link, { season: CURRENT_SEASON, fetch: sample ? espnSampleFetch : undefined })
+          : await importMflLeague(sample ? MFL_SAMPLE_LEAGUE_ID : link, { season: CURRENT_SEASON, fetch: sample ? mflSampleFetch : undefined });
+      setResult({ league, review: [] });
+    } catch (e) {
+      const msg = (e as Error)?.message ?? String(e);
+      setError(e instanceof TypeError || /failed to fetch|network|load failed/i.test(msg) ? `We couldn't reach ${kind === 'espn' ? 'ESPN' : 'MFL'} from this preview page. The app will. Try the sample league to see the flow.` : msg);
     } finally {
       setBusy(false);
     }
@@ -221,7 +265,7 @@ export default function Import() {
       <H1>Bring your league over</H1>
       <T muted style={{ marginBottom: 12 }}>You keep everything. Your league just taps a link.</T>
       {SOURCES.map((s) => (
-        <Card key={s.key} highlight={source === s.key} onPress={() => (s.ready ? setSource(s.key) : toast(`${s.label} import is next on the list. Paste rosters works today.`))}>
+        <Card key={s.key} highlight={source === s.key} onPress={() => { setError(null); if (s.ready) setSource(s.key); else toast(`${s.label} needs our sign-in server, which comes with the backend. Paste rosters works today.`); }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <T style={type.title}>{s.label}</T>
             {!s.ready ? <T muted style={type.small}>Coming soon</T> : null}
@@ -248,7 +292,18 @@ export default function Import() {
                   {!found.leagues.length ? <T muted>No leagues found for this season.</T> : null}
                 </>
               ) : null}
-              <T muted style={[type.micro, { marginTop: 6 }]}>Preview uses sample data. Only "Group Chat Dynasty" imports.</T>
+              <T muted style={[type.micro, { marginTop: 6 }]}>Uses Sleeper's public data, so no password. Sample username: {SLEEPER_DEMO_USERNAME}.</T>
+            </View>
+          ) : null}
+          {(s.key === 'espn' || s.key === 'mfl') && source === s.key ? (
+            <View style={{ marginTop: 12 }}>
+              <Input value={link} onChangeText={setLink} autoCapitalize="none" autoCorrect={false} placeholder={s.key === 'espn' ? 'fantasy.espn.com/football/league?leagueId=…' : 'myfantasyleague.com/2026/home/…'} />
+              {error ? <T style={{ color: c.danger, marginTop: 6 }}>{error}</T> : null}
+              <View style={{ height: 8 }} />
+              <Button label={busy ? 'Reading your league…' : `Import from ${s.label}`} disabled={busy || !link.trim()} onPress={() => runLink(s.key as 'espn' | 'mfl')} />
+              <Pressable onPress={() => runLink(s.key as 'espn' | 'mfl', true)} style={{ paddingVertical: 10 }}>
+                <T style={[type.smallStrong, { color: c.accent }]}>Try a sample {s.label} league</T>
+              </Pressable>
             </View>
           ) : null}
           {source === 'paste' && s.key === 'paste' ? (

@@ -24,8 +24,14 @@ export function TeamAvatar({ team, size = 32 }: { team: Pick<DemoTeam, 'emoji' |
   );
 }
 
-export function LeagueAvatar({ league, size = 32 }: { league: Pick<DemoLeague, 'imageUri'>; size?: number }) {
+export function LeagueAvatar({ league, size = 32 }: { league: Pick<DemoLeague, 'imageUri' | 'emoji'>; size?: number }) {
   if (league.imageUri) return <Image source={{ uri: league.imageUri }} style={{ width: size, height: size, borderRadius: size * 0.3 }} />;
+  if (league.emoji)
+    return (
+      <View style={{ width: size, height: size, borderRadius: size * 0.3, backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+        <T style={{ fontSize: size * 0.55, lineHeight: size * 0.75 }}>{league.emoji}</T>
+      </View>
+    );
   return <Image source={require('../../assets/logo-mark.png')} style={{ width: size, height: size }} />;
 }
 
@@ -38,9 +44,7 @@ export function leagueKicker(L: DemoLeague) {
 /** League name with a switcher, shown at the top of every league tab. */
 export function LeagueHeader({ sub }: { sub?: string }) {
   const L = useApp((s) => s.league);
-  const leagues = useApp((s) => s.leagues);
-  const switchLeague = useApp((s) => s.switchLeague);
-  const [open, setOpen] = useState(false);
+  const setOpen = useApp((s) => s.setSwitcherOpen);
   return (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 12 }}>
@@ -57,6 +61,19 @@ export function LeagueHeader({ sub }: { sub?: string }) {
           <T style={{ fontSize: 18 }}>⚙︎</T>
         </Pressable>
       </View>
+    </>
+  );
+}
+
+/** Pick which league every tab shows. Mounted once, in the tab layout. */
+export function LeagueSwitcher() {
+  const L = useApp((s) => s.league);
+  const leagues = useApp((s) => s.leagues);
+  const switchLeague = useApp((s) => s.switchLeague);
+  const open = useApp((s) => s.switcherOpen);
+  const setOpen = useApp((s) => s.setSwitcherOpen);
+  return (
+    <>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: '#000A', justifyContent: 'flex-end' }}>
           <View style={{ backgroundColor: c.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: 34, maxWidth: 640, width: '100%', alignSelf: 'center' }}>

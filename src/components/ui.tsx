@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -137,12 +137,34 @@ export function Segmented<K extends string>({ options, value, onChange }: { opti
 
 export function Stepper({ value, onChange, min = 0, max = 99, step = 1, format }: { value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; format?: (v: number) => string }) {
   const round = (v: number) => Math.round(v * 100) / 100;
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    const n = Number(draft.replace(/[^0-9.\-]/g, ''));
+    if (draft.trim() !== '' && Number.isFinite(n)) onChange(round(Math.max(min, Math.min(max, n))));
+    setDraft(null);
+  };
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <Pressable onPress={() => onChange(round(Math.max(min, value - step)))} style={styles.stepBtn}>
         <T style={type.bodyStrong}>−</T>
       </Pressable>
-      <T style={[type.num, { minWidth: 46, textAlign: 'center', color: c.text, fontSize: 15 }]}>{format ? format(value) : String(value)}</T>
+      {draft !== null ? (
+        <TextInput
+          autoFocus
+          value={draft}
+          onChangeText={setDraft}
+          onBlur={commit}
+          onSubmitEditing={commit}
+          keyboardType="decimal-pad"
+          selectTextOnFocus
+          style={[type.num, { minWidth: 46, maxWidth: 70, textAlign: 'center', color: c.text, fontSize: 15, borderBottomWidth: 1, borderBottomColor: c.accent, paddingVertical: 2 }]}
+        />
+      ) : (
+        <Pressable onPress={() => setDraft(String(value))} hitSlop={6} accessibilityLabel="Type a value">
+          <T style={[type.num, { minWidth: 46, textAlign: 'center', color: c.text, fontSize: 15 }]}>{format ? format(value) : String(value)}</T>
+        </Pressable>
+      )}
       <Pressable onPress={() => onChange(round(Math.min(max, value + step)))} style={styles.stepBtn}>
         <T style={type.bodyStrong}>+</T>
       </Pressable>

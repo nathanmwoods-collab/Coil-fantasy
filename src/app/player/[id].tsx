@@ -7,7 +7,7 @@ import { Reactions } from '../../components/Reactions';
 import { TeamDepth } from '../../components/TeamDepth';
 import { Button, c, Card, InjuryBadge, Input, PlayerAvatar, POS_COLORS, Screen, Segmented, T } from '../../components/ui';
 import { ageOf, CURRENT_SEASON, CURRENT_WEEK, heightLabel, ME } from '../../demo/league';
-import { fullStatLine, nflGame, ownership, playerWeek, snapShare, statSummary } from '../../demo/games';
+import { fullStatLine, matchupColor, nflGame, ownership, playerWeek, snapShare, statSummary } from '../../demo/games';
 import { injuryTag, irEligible, scoreStatLine, scoringFromPreset, taxiEligible, type StatLine } from '../../engine';
 import { NFL_TEAMS } from '../../news/sources';
 import { useApp } from '../../store/useApp';
@@ -249,6 +249,7 @@ export default function PlayerCard() {
         <>
           <T style={[type.title, { marginBottom: 6 }]}>{CURRENT_SEASON}</T>
           <LogTable
+            pos={p.position}
             cols={cols}
             rows={data.log.map((g) => ({
               week: g.week,
@@ -263,7 +264,7 @@ export default function PlayerCard() {
           <Pressable onPress={() => setPastOpen(!pastOpen)} style={{ paddingVertical: 12 }}>
             <T style={[type.title, { color: c.accent }]}>{CURRENT_SEASON - 1} {pastOpen ? '▾' : '▸'}</T>
           </Pressable>
-          {pastOpen ? <LogTable cols={cols} rows={data.past.map((g) => ({ week: g.week, opp: g.opp, fpts: g.pts, snp: g.pts === null ? null : snapShare(p, g.week + 100), rank: null, stats: g.pts === null ? null : g.stats }))} heat={() => 'transparent'} /> : null}
+          {pastOpen ? <LogTable pos={p.position} cols={cols} rows={data.past.map((g) => ({ week: g.week, opp: g.opp, fpts: g.pts, snp: g.pts === null ? null : snapShare(p, g.week + 100), rank: null, stats: g.pts === null ? null : g.stats }))} heat={() => 'transparent'} /> : null}
         </>
       )}
 
@@ -282,7 +283,7 @@ export default function PlayerCard() {
 
 type LogRow = { week: number; opp: string; fpts: number | null; snp: number | null; rank: number | null; stats: StatLine | null };
 
-function LogTable({ cols, rows, heat }: { cols: Col[]; rows: LogRow[]; heat: (k: Col['key'], v: number | null | undefined) => string }) {
+function LogTable({ cols, rows, heat, pos }: { cols: Col[]; rows: LogRow[]; heat: (k: Col['key'], v: number | null | undefined) => string; pos: string }) {
   const all: Col[] = [{ key: 'fpts', label: 'FPTS', group: 'FANTASY' }, { key: 'snp', label: 'SNP%', group: 'FANTASY' }, { key: 'rank', label: 'RANK', group: 'FANTASY' }, ...cols];
   const W = 52;
   return (
@@ -294,7 +295,7 @@ function LogTable({ cols, rows, heat }: { cols: Col[]; rows: LogRow[]; heat: (k:
         {rows.map((r) => (
           <View key={r.week} style={{ height: 30, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }}>
             <T style={[type.num, { width: 24, fontSize: 12 }]}>{r.week}</T>
-            <T style={[type.smallStrong, { fontSize: 12, color: r.opp === 'BYE' ? c.textMuted : r.opp.startsWith('@') ? c.warning : c.accent }]}>{r.opp}</T>
+            <T style={[type.smallStrong, { fontSize: 12, color: r.opp === 'BYE' ? c.textMuted : matchupColor(r.opp.replace('@', ''), pos, { hard: c.danger, easy: c.success, neutral: c.text }) }]}>{r.opp}</T>
           </View>
         ))}
       </View>
